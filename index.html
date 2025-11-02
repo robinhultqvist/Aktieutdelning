@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Utdelningsportfölj - Enkel version</title>
+  <style>
+    body { max-width:900px; margin:30px auto; padding:20px; background:#1e1e1e; color:#f0f0f0; font-family:Inter,sans-serif; border-radius:10px; }
+    h1 { margin-bottom:20px; }
+    form { display:grid; grid-template-columns:1fr 80px 100px 100px 150px 150px auto; gap:10px; align-items:end; margin-bottom:20px; }
+    input, select, button { padding:8px; border-radius:6px; border:1px solid #555; background:#2a2a2a; color:#fff; font-family:inherit; font-size:14px; }
+    button { border:0; background:#2563eb; cursor:pointer; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th, td { padding:8px; text-align:left; border-bottom:1px solid #333; }
+    tfoot td { font-weight:bold; }
+    .breakdown { margin-top:20px; padding:12px; background:#2a2a2a; border-radius:8px; }
+    .months-checkboxes { display:flex; flex-wrap:wrap; gap:5px; max-height:120px; overflow-y:auto; padding:4px; border:1px solid #555; border-radius:6px; background:#2a2a2a; }
+    .months-checkboxes label { font-size:14px; cursor:pointer; }
+    .flag-img { width:20px; height:14px; margin-right:6px; vertical-align:middle; }
+    .month-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; font-size:14px; }
+    .month-grid div { padding:4px; background:#3a3a3a; border-radius:4px; text-align:center; }
+    .delete-btn { background:#dc2626; padding:4px 6px; border-radius:4px; cursor:pointer; color:#fff; border:none; }
+    .editable { cursor:pointer; background-color:#2e2e2e; border-radius:4px; transition:background 0.2s, box-shadow 0.2s; position:relative; }
+    .editable:hover { background-color:#3a3a3a; }
+    .editable:focus { outline:none; background-color:#334155; box-shadow:0 0 0 2px #2563eb; }
+    .editable::after { content:'✏️'; position:absolute; right:6px; top:4px; font-size:12px; opacity:0.6; }
+  </style>
+</head>
+<body>
+  <h1>Utdelningsportfölj</h1>
+
+  <form id="portfolioForm">
+    <input id="company" placeholder="Bolag" required />
+    <input id="shares" type="number" min="0" step="1" placeholder="Antal" required />
+    <input id="dividend" type="number" min="0" step="0.01" placeholder="Utd/aktie" required />
+    <select id="frequency">
+      <option value="1">1/år</option>
+      <option value="2">2/år</option>
+      <option value="4">4/år</option>
+      <option value="12">12/år</option>
+    </select>
+    <select id="currency">
+      <option value="SEK">SEK</option>
+      <option value="USD">USD</option>
+      <option value="EUR">EUR</option>
+      <option value="GBP">GBP</option>
+      <option value="NOK">NOK</option>
+      <option value="DKK">DKK</option>
+    </select>
+    <div class="months-checkboxes" id="months">
+      <label><input type="checkbox" value="0">Jan</label>
+      <label><input type="checkbox" value="1">Feb</label>
+      <label><input type="checkbox" value="2">Mar</label>
+      <label><input type="checkbox" value="3">Apr</label>
+      <label><input type="checkbox" value="4">Maj</label>
+      <label><input type="checkbox" value="5">Jun</label>
+      <label><input type="checkbox" value="6">Jul</label>
+      <label><input type="checkbox" value="7">Aug</label>
+      <label><input type="checkbox" value="8">Sep</label>
+      <label><input type="checkbox" value="9">Okt</label>
+      <label><input type="checkbox" value="10">Nov</label>
+      <label><input type="checkbox" value="11">Dec</label>
+    </div>
+    <button type="submit">Lägg till</button>
+  </form>
+
+  <table id="portfolioTable">
+    <thead>
+      <tr>
+        <th>Bolag</th><th>Antal ✏️</th><th>Utd/aktie ✏️</th><th>Utdelningar/år</th><th>Valuta</th><th>Årlig utdelning (SEK)</th><th>Månader</th><th>Ta bort</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+    <tfoot>
+      <tr><td colspan="7" style="text-align:right">Totalt (SEK):</td><td id="total">0</td></tr>
+    </tfoot>
+  </table>
+
+  <div class="breakdown" id="monthlyBreakdown">
+    <h3>Utdelning per månad (SEK)</h3>
+    <div id="monthSums" class="month-grid">Ingen data än.</div>
+  </div>
+
+  <script>
+    const form = document.getElementById('portfolioForm');
+    const tbody = document.querySelector('#portfolioTable tbody');
+    const totalCell = document.getElementById('total');
+    const monthSums = document.getElementById('monthSums');
+
+    const exchangeRates = {
+      'SEK': 1,
+      'USD': 11.0,
+      'EUR': 12.0,
+      'GBP': 14.0,
+      'NOK': 1.2,
+      'DKK': 1.6
+    };
+
+    const currencyFlags = {
+      'SEK': 'https://upload.wikimedia.org/wikipedia/en/4/4c/Flag_of_Sweden.svg',
+      'USD': 'https://upload.wikimedia.org/wikipedia/en/a/a4/Flag_of_the_United_States.svg',
+      'EUR': 'https://upload.wikimedia.org/wikipedia/commons/b/b7/Flag_of_Europe.svg',
+      'GBP': 'https://upload.wikimedia.org/wikipedia/en/a/ae/Flag_of_the_United_Kingdom.svg',
+      'NOK': 'https://upload.wikimedia.org/wikipedia/commons/d/d9/Flag_of_Norway.svg',
+      'DKK': 'https://upload.wikimedia.org/wikipedia/commons/0/0c/Flag_of_Denmark.svg'
+    };
+
+    const monthNames = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+
+    const previousPortfolio = [
+      {company: 'ABB', shares: 10, dividend: 5, freq: 2, currency: 'SEK', months: [5,11]},
+      {company: 'Apple', shares: 5, dividend: 0.8, freq: 4, currency: 'USD', months: [2,5,8,11]}
+    ];
+
+    let portfolio = JSON.parse(localStorage.getItem('portfolio') || '[]');
+    if (portfolio.length === 0) {
+      portfolio = previousPortfolio.map(item => ({
+        ...item,
+        annualSEK: item.shares * item.dividend * item.freq * exchangeRates[item.currency]
+      }));
+      localStorage.setItem('portfolio', JSON.stringify(portfolio));
+    }
+
+    function savePortfolio() {
+      localStorage.setItem('portfolio', JSON.stringify(portfolio));
+    }
+
+    function renderTable() {
+      tbody.innerHTML = '';
+      let total = 0;
+      const monthTotals = Array(12).fill(0);
+
+      portfolio.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        const flagImg = currencyFlags[item.currency] ? `<img src='${currencyFlags[item.currency]}' class='flag-img'>` : '';
+
+        tr.innerHTML = `
+          <td>${flagImg}${item.company}</td>
+          <td class='editable' data-field='shares' data-index='${index}' contenteditable='true'>${item.shares}</td>
+          <td class='editable' data-field='dividend' data-index='${index}' contenteditable='true'>${item.dividend}</td>
+          <td>${item.freq}/år</td>
+          <td>${item.currency}</td>
+          <td data-sek='${item.annualSEK}'>${item.annualSEK.toFixed(2)}</td>
+          <td>${item.months.map(m => monthNames[m]).join(', ')}</td>
+          <td><button class='delete-btn'>Ta bort</button></td>
+        `;
+        tbody.appendChild(tr);
+
+        tr.querySelector('.delete-btn').addEventListener('click', () => {
+          portfolio.splice(index, 1);
+          savePortfolio();
+          renderTable();
+        });
+
+        tr.querySelectorAll('.editable').forEach(cell => {
+          cell.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              const field = cell.dataset.field;
+              const newVal = parseFloat(cell.textContent);
+              if (!isNaN(newVal) && newVal >= 0) {
+                item[field] = newVal;
+                item.annualSEK = item.shares * item.dividend * item.freq * exchangeRates[item.currency];
+                savePortfolio();
+                renderTable();
+              } else {
+                cell.textContent = item[field];
+              }
+            }
+          });
+        });
+
+        total += item.annualSEK;
+        item.months.forEach(m => monthTotals[m] += item.annualSEK / (item.months.length || 1));
+      });
+
+      totalCell.textContent = total.toFixed(2);
+      monthSums.innerHTML = '';
+      monthTotals.forEach((val, i) => {
+        monthSums.innerHTML += `<div>${monthNames[i]}: ${val.toFixed(2)} SEK</div>`;
+      });
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const company = document.getElementById('company').value;
+      const shares = parseFloat(document.getElementById('shares').value);
+      const dividend = parseFloat(document.getElementById('dividend').value);
+      const freq = parseInt(document.getElementById('frequency').value);
+      const currency = document.getElementById('currency').value;
+      const monthCheckboxes = document.querySelectorAll('#months input[type=checkbox]:checked');
+      const selectedMonths = Array.from(monthCheckboxes).map(cb => parseInt(cb.value));
+      const annualDiv = shares * dividend * freq;
+      const annualSEK = annualDiv * exchangeRates[currency];
+
+      portfolio.push({ company, shares, dividend, freq, currency, months: selectedMonths, annualSEK });
+      savePortfolio();
+      renderTable();
+      form.reset();
+    });
+
+    renderTable();
+  </script>
+</body>
+</html>
