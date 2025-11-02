@@ -85,10 +85,10 @@
   <div id="tooltip" class="tooltip"></div>
 
   <script>
-    const exchangeRates = { 'SEK': 1, 'USD': 11.5, 'EUR': 12.3, 'GBP': 14.7, 'NOK': 1.25, 'DKK': 1.65 };
+    const exchangeRates = { 'SEK':1, 'USD':11.5, 'EUR':12.3, 'GBP':14.7, 'NOK':1.25, 'DKK':1.65 };
     const currencyFlags = { 'SEK':'https://flagcdn.com/se.svg', 'USD':'https://flagcdn.com/us.svg', 'EUR':'https://flagcdn.com/eu.svg', 'GBP':'https://flagcdn.com/gb.svg', 'NOK':'https://flagcdn.com/no.svg', 'DKK':'https://flagcdn.com/dk.svg' };
 
-    let portfolio = JSON.parse(localStorage.getItem('portfolio') || '[]');
+    let portfolio = JSON.parse(localStorage.getItem('portfolio')||'[]');
 
     const tbody = document.querySelector('#portfolioTable tbody');
     const totalCell = document.getElementById('total');
@@ -96,25 +96,24 @@
     const tooltip = document.getElementById('tooltip');
     const form = document.getElementById('portfolioForm');
 
-    function savePortfolio() { localStorage.setItem('portfolio', JSON.stringify(portfolio)); }
+    function savePortfolio(){localStorage.setItem('portfolio',JSON.stringify(portfolio));}
 
-    function renderTable() {
-      tbody.innerHTML = '';
-      let total = 0;
-      const monthTotals = Array(12).fill(0);
-      const monthDetails = Array.from({length:12}, () => []);
+    function renderTable(){
+      tbody.innerHTML='';
+      let total=0;
+      const monthTotals=Array(12).fill(0);
+      const monthDetails=Array.from({length:12},()=>[]);
 
-      portfolio.forEach((item, index) => {
-        const tr = document.createElement('tr');
-        const annualSEK = item.shares * item.dividend * item.freq * exchangeRates[item.currency];
-        const quarterlySEK = (item.freq === 4) ? (annualSEK / 4).toFixed(2) : '';
-        const months = item.months.length > 0 ? item.months : Array.from({length: item.freq}, (_, i) => i);
+      portfolio.forEach((item,index)=>{
+        const tr=document.createElement('tr');
+        const annualSEK=item.shares*item.dividend*item.freq*exchangeRates[item.currency];
+        const quarterlySEK=(item.freq===4)?(annualSEK/4).toFixed(2):'';
+        const months=item.months.length>0?item.months:Array.from({length:item.freq},(_,i)=>i);
 
-        months.forEach(m => { monthTotals[m] += annualSEK / months.length; monthDetails[m].push(`${item.company}: ${(annualSEK / months.length).toFixed(2)} SEK`); });
-        const monthlyCellContent = (item.freq === 12) ? (annualSEK / 12).toFixed(2) : '';
+        months.forEach(m=>{monthTotals[m]+=annualSEK/months.length; monthDetails[m].push(`${item.company}: ${(annualSEK/months.length).toFixed(2)} SEK`);});
+        const monthlyCellContent=(item.freq===12)?(annualSEK/12).toFixed(2):'';
 
-        tr.innerHTML = `
-          <td><span class='flag' style="background-image:url('${currencyFlags[item.currency]}')"></span>${item.company}</td>
+        tr.innerHTML=`<td><span class='flag' style="background-image:url('${currencyFlags[item.currency]}')"></span>${item.company}</td>
           <td class='editable' data-field='shares' data-index='${index}' contenteditable='true'>${item.shares}</td>
           <td class='editable' data-field='dividend' data-index='${index}' contenteditable='true'>${item.dividend}</td>
           <td>${item.freq}/år</td>
@@ -125,24 +124,34 @@
           <td><button class='delete-btn'>Ta bort</button></td>`;
 
         tbody.appendChild(tr);
-
-        tr.querySelector('.delete-btn').addEventListener('click', () => { portfolio.splice(index, 1); savePortfolio(); renderTable(); });
-
-        tr.querySelectorAll('.editable').forEach(cell => {
-          cell.addEventListener('input', () => { 
-            const field = cell.dataset.field;
-            const idx = parseInt(cell.dataset.index);
-            const newVal = parseFloat(cell.textContent);
-            if(!isNaN(newVal) && newVal >= 0) { portfolio[idx][field] = newVal; savePortfolio(); renderTable(); } 
+        tr.querySelector('.delete-btn').addEventListener('click',()=>{portfolio.splice(index,1); savePortfolio(); renderTable();});
+        tr.querySelectorAll('.editable').forEach(cell=>{
+          cell.addEventListener('input',()=>{
+            const field=cell.dataset.field;
+            const idx=parseInt(cell.dataset.index);
+            const newVal=parseFloat(cell.textContent);
+            if(!isNaN(newVal)&&newVal>=0){portfolio[idx][field]=newVal; savePortfolio(); renderTable();}
           });
         });
 
-        total += annualSEK;
+        total+=annualSEK;
       });
 
-      totalCell.textContent = total.toFixed(2);
-      monthSums.innerHTML = '';
-      monthTotals.forEach((val, i) => {
-        const monthDiv = document.createElement('div');
-        monthDiv.textContent = `${['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'][i]}: ${val.toFixed(2)} SEK`;
-        monthDiv.addEventListener('mouseenter', e => { tooltip.style.display='block'; tooltip.style.left=e.pageX+10+'px'; tooltip.style.top=e.pageY+10+'px'; tooltip.innerHTML = monthDetails[i].join('<
+      totalCell.textContent=total.toFixed(2);
+      monthSums.innerHTML='';
+      monthTotals.forEach((val,i)=>{
+        const monthDiv=document.createElement('div');
+        monthDiv.textContent=`${['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'][i]}: ${val.toFixed(2)} SEK`;
+        monthDiv.addEventListener('mouseenter',e=>{tooltip.style.display='block'; tooltip.style.left=e.pageX+10+'px'; tooltip.style.top=e.pageY+10+'px'; tooltip.innerHTML=monthDetails[i].join('<br>');});
+        monthDiv.addEventListener('mouseleave',()=>{tooltip.style.display='none';});
+        monthSums.appendChild(monthDiv);
+      });
+    }
+
+    form.addEventListener('submit',e=>{
+      e.preventDefault();
+      const company=document.getElementById('company').value;
+      const shares=parseFloat(document.getElementById('shares').value);
+      const dividend=parseFloat(document.getElementById('dividend').value);
+      const freq=parseInt(document.getElementById('frequency').value);
+      const currency=document
