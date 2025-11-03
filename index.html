@@ -4,8 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Utdelningsportfölj - Enkel version</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { max-width:900px; margin:30px auto; padding:20px; background:#1e1e1e; color:#f0f0f0; font-family:Inter,sans-serif; border-radius:10px; }
+    body { max-width:900px; margin:30px auto; padding:20px; background:#1e1e1e; color:#f0f0f0; font-family:Inter,sans-serif; border-radius:10px; transition:background 0.3s,color 0.3s; }
     h1 { margin-bottom:5px; }
     .note { font-size:0.85em; color:#ccc; margin-bottom:20px; }
     form { display:grid; grid-template-columns:1fr 80px 100px 100px 150px 150px auto; gap:10px; align-items:end; margin-bottom:20px; }
@@ -81,7 +82,8 @@
 
   <div class="breakdown" id="monthlyBreakdown">
     <h3>Utdelning per månad (SEK)</h3>
-    <div id="monthSums" class="month-grid">Ingen data än.</div>
+    <canvas id="dividendChart" height="100"></canvas>
+    <div id="monthSums" class="month-grid"></div>
   </div>
 
   <div id="tooltip" class="tooltip"></div>
@@ -97,8 +99,22 @@
     const monthSums = document.getElementById('monthSums');
     const tooltip = document.getElementById('tooltip');
     const form = document.getElementById('portfolioForm');
+    let chart;
 
     function savePortfolio(){ localStorage.setItem('portfolio', JSON.stringify(portfolio)); }
+
+    function renderChart(monthTotals){
+      const ctx = document.getElementById('dividendChart');
+      if(chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type:'bar',
+        data:{
+          labels:['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'],
+          datasets:[{ label:'Utdelning (SEK)', data:monthTotals, borderWidth:1 }]
+        },
+        options:{ plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } }
+      });
+    }
 
     function renderTable(){
       tbody.innerHTML = '';
@@ -148,6 +164,7 @@
         monthDiv.addEventListener('mouseleave', ()=>{ tooltip.style.display='none'; });
         monthSums.appendChild(monthDiv);
       });
+      renderChart(monthTotals);
     }
 
     form.addEventListener('submit', e=>{
